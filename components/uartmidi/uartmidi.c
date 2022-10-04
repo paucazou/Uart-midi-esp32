@@ -30,19 +30,20 @@
  * =============================================================================
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "uartmidi.h"
 
-#include "esp_system.h"
-#include "esp_log.h"
+#include "driver/gpio.h"
 #include "driver/uart.h"
-#include <sys/time.h>
 
 #include "nvs_flash.h"
 #include "nvs.h"
+#include "esp_system.h"
+#include "esp_log.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
 
-#include "uartmidi.h"
 
 #if UARTMIDI_ENABLE_CONSOLE
 # include "esp_console.h"
