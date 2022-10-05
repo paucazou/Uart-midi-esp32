@@ -85,13 +85,21 @@ static void task_midi(void *pvParameters)
   // this UART is connected to TX pin 17, RX pin 16
   // see also components/uartmidi/uartmidi.c
 #if 1
-  uartmidi_enable_port(0, 31250);
+  uartmidi_enable_port(0, 115200);
 #else
   uartmidi_enable_port(1, 115200); // for "Hairless MIDI", connected to Tx Pin 1, RX Pin 3 via USB UART bridge
 #endif
+  while (1) {
+    ESP_LOGI(TAG,"sending midi msg...");
+      uint8_t message[3] = { 0x90, 0x3c, 0x7f };
+      ESP_LOGI(TAG,"err: %ld",uartmidi_send_message(0, message, sizeof(message)));
+    vTaskDelay(1 / portTICK_PERIOD_MS);
+    ESP_LOGI(TAG,"End of loop");
+  }
+
 
   while (1) {
-    vTaskDelay(1 / portTICK_RATE_MS);
+    vTaskDelay(1 / portTICK_PERIOD_MS);
 
     uartmidi_tick();
   }
@@ -100,6 +108,7 @@ static void task_midi(void *pvParameters)
 void app_main()
 {
   xTaskCreate(task_midi, "task_midi", 4096, NULL, 8, NULL);
+  ESP_LOGI(TAG,"Starting !!!!!!!!!!!!!!");
 
 #if 1
   // disable this for less debug messages (avoid packet loss on loopbacks)

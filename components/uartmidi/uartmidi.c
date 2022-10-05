@@ -45,6 +45,7 @@
 #include <sys/time.h>
 
 
+
 #if UARTMIDI_ENABLE_CONSOLE
 # include "esp_console.h"
 # include "argtable3/argtable3.h"
@@ -185,14 +186,26 @@ int32_t uartmidi_init(void *_callback_midi_message_received)
 #if UARTMIDI_NUM_PORTS >= 3
   {
     uint8_t uartmidi2_enabled = 0;
+        // Initialize NVS
+    esp_err_t nvs_err = nvs_flash_init();
+    if (nvs_err == ESP_ERR_NVS_NO_FREE_PAGES || nvs_err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        // NVS partition was truncated and needs to be erased
+        // Retry nvs_flash_init
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        nvs_err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK( nvs_err );
+
     nvs_handle nvs_handle;
     esp_err_t err;
 
     err = nvs_open(UARTMIDI_STORAGE_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(err);
     if( err != ESP_OK ) {
       ESP_LOGW(UARTMIDI_TAG, "UARTMIDI Configuration not stored so far...");
+
     } else {
-      int pin = 0;
+      long int pin = 0;
       err = nvs_get_i32(nvs_handle, "enable_jumper", &pin);
 
       if( err != ESP_OK ) {
@@ -202,7 +215,8 @@ int32_t uartmidi_init(void *_callback_midi_message_received)
 
         if( uartmidi_enable_jumper > 0 ) {
           // this GPIO switches UART interface between MIDI and Console
-          gpio_pad_select_gpio(uartmidi_enable_jumper);
+        // TODO adding gpio_reset_pin ?
+          esp_rom_gpio_pad_select_gpio(uartmidi_enable_jumper);
           gpio_set_direction(uartmidi_enable_jumper, GPIO_MODE_INPUT);
 
           // TODO: enable internal Pull-Up?
@@ -240,6 +254,7 @@ int32_t uartmidi_enable_port(uint8_t uartmidi_port, uint32_t baudrate)
     .parity    = UART_PARITY_DISABLE,
     .stop_bits = UART_STOP_BITS_1,
     .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+    .source_clk = UART_SCLK_DEFAULT,
     //.use_ref_tick = 1,
   };
 
@@ -253,7 +268,8 @@ int32_t uartmidi_enable_port(uint8_t uartmidi_port, uint32_t baudrate)
 #if UARTMIDI_NUM_PORTS >= 1
     uartmidi_init_handle(uart);
     uart->dev = UARTMIDI_PORT0_DEV;
-    ESP_ERROR_CHECK(uart_param_config(UARTMIDI_PORT0_DEV, &uart_config));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(uart_param_config(UARTMIDI_PORT0_DEV, &uart_config));
+
     ESP_ERROR_CHECK(uart_set_pin(UARTMIDI_PORT0_DEV, UARTMIDI_PORT0_TXD, UARTMIDI_PORT0_RXD, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     ESP_ERROR_CHECK(uart_driver_install(UARTMIDI_PORT0_DEV, UARTMIDI_RX_FIFO_SIZE, UARTMIDI_TX_FIFO_SIZE, 0, NULL, 0));
     ESP_ERROR_CHECK(uart_set_rx_timeout(UARTMIDI_PORT0_DEV, 1)); // decrease timeout to get incoming RX data immediately
@@ -578,7 +594,7 @@ int32_t uartmidi_tick(void)
         if( len >= UARTMIDI_RX_FIFO_SIZE )
           len = UARTMIDI_RX_FIFO_SIZE;
 
-        len = uart_read_bytes(uart->dev, buffer, len, 1 / portTICK_RATE_MS); // we assume no delay since len is matching with available bytes
+        len = uart_read_bytes(uart->dev, buffer, len, 1 / portTICK_PERIOD_MS); // we assume no delay since len is matching with available bytes
 
 #if 1
         uartmidi_receive_stream(i, buffer, len);
